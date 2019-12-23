@@ -1,0 +1,1004 @@
+---
+title: "Gary Bédoucha & Ethan Cohen"
+output: html_notebook
+---
+
+# Exercice 1: Simulations de variables aleatoires. 
+
+# Preambule: Determination de la constante de normalisation "c".
+
+
+On peut caculer un estimateur de la constante de normalisation c de 2 differentes manieres :
+
+
+*Methode 1 : c etant egale a l'inverse de l'integrale de ftilde, on trouve une valeur estimee de la constante c par la methode de Monte Carlo classique appliquee a ftilde.*
+
+```{r}
+# Methode 1.a : ftilde vu comme une esperance sous une loi uniforme(0,4) x uniforme(0,2).
+
+ftilde_a<-function(x1,x2){8*((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))}
+n=10000
+x1=runif(n,0,4)
+x2=runif(n,0,2)
+v_a=ftilde_a(x1,x2)
+c_inverse_a=mean(v_a)
+
+c_a=1/c_inverse_a
+c_a  
+```
+
+
+```{r}
+# Methode 1.b : ftilde vu comme une esperance sous une loi normale(2,1) x uniforme(0,2).
+
+ftilde_b<-function(x1,x2){ 2*sqrt(2*pi) * (  ( (cos(x1)**2) + 2*(sin(x2)**2) * (cos(x1)**4) ) / (1+4*( (x2-1)**2)) ) * (x1>=0 & x1<=4) }
+n=10000
+x1=rnorm(n,2,1)
+x2=runif(n,0,2)
+v_b=ftilde_b(x1,x2)
+c_inverse_b = mean(v_b)
+
+c_b=1/c_inverse_b
+c_b 
+```
+
+
+*Methode 2 : En interpretant la constante c comme etant l'inverse du produit de la probabilite d'acceptation de l'algorithme du rejet et de de la constante M.*
+```{r}
+#Algorithme de rejet avec la densite instrumentale g suivant une loi normale (2,1) x uniforme (0,2)
+
+rejet_deter_c <- function(n) {
+  M2=matrix(0,ncol=2,nrow=n)
+  ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+  g2<- function(x1,x2){dnorm(x1,2,1)*dunif(x2,0,2)}
+  C2=6*sqrt(2*pi)
+  K=0
+  for (i in 1:n) {
+    x1=rnorm(1,2,1)
+    x2=runif(1,0,2)
+    u=runif(1,0, C2*g2(x1,x2))
+    
+     
+      while ( u >= ftilde(x1,x2) ) {
+      x1=rnorm(1,2,1)
+      x2=runif(1,0,2)
+      u=runif(1,0, C2*g2(x1,x2))
+      K=K+1
+      
+    }
+    M2[i,1]=x1
+    M2[i,2]=x2
+    
+  
+   }
+  
+  return(K)
+}
+
+
+n=10000
+
+K=rejet_deter_c(n)
+p=n/(n+K) # p represente enmpiriquement la proba d'acceptation de l'algorithme = nb test accepte / nb test total ... , K represente le nombre de fois ou u>=ftilde...
+
+C2=6*sqrt(2*pi)
+c_methode2= 1/(C2*p)
+c_methode2  
+```
+
+
+Desormais, fort de l'obtention de la constante de normalisation c, debutons l'exercice 1. 
+```{r}
+# Question 2 et 3
+
+# Methode 1: Rejet avec une densite instrumentale g suivant une loi uniforme (0,2) x uniforme (0,4)
+
+C1=24
+g1<- function(x1,x2){dunif(x1,0,4)*dunif(x2,0,2)} 
+ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+
+
+rejet <- function(n) {
+  M1=matrix(0,ncol=2,nrow=n)
+  for (i in 1:n) {
+    x1=runif(1,0,4)
+    x2=runif(1,0,2)
+    u=runif(1,0, C1*g1(x1,x2))
+    
+     
+      while ( u >= ftilde(x1,x2) ) {
+       x1=runif(1,0,4)
+       x2=runif(1,0,2)
+       u=runif(1,0, C1*g1(x1,x2))
+      
+    }
+    M1[i,1]=x1
+    M1[i,2]=x2
+    
+  
+   }
+  
+  return(M1)
+}
+
+n=1000
+T1_a<-Sys.time()
+M1=rejet(1000)
+T1_b<-Sys.time()
+
+Tdiff1=difftime(T1_b,T1_a)  #permet de calculer le temps d'execution de la fonction rejet 1.
+
+M1_a1= M1[,1]  #colonne 1 
+M1_a2=M1[,2]  #colonne 2
+
+M1_a1_c=cut(M1_a1,20)
+M1_a2_c=cut(M1_a2,20)
+z1=table(M1_a1_c,M1_a2_c)
+
+
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j])  # permet de tracer f
+  } 
+} 
+
+par(mfrow=c(1,2)) # permet d'afficher les 2 prochains graphiques cote a cote
+
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densite f")
+plot3D::hist3D(z = z1, border = "black", theta = 40, phi = 40,main="Histogramme par rejet")  # histogramme representant f par la methode de rejet 1.
+```
+
+
+```{r}
+
+# Methode 2 : Rejet avec une densite instrumentale g suivant une loi normale (2,1) x uniforme (0,2)
+
+C2=6*sqrt(2*pi)
+g2<- function(x1,x2){dnorm(x1,2,1)*dunif(x2,0,2)}
+ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+
+
+rejet <- function(n) {
+  M2=matrix(0,ncol=2,nrow=n)
+  for (i in 1:n) {
+    x1=rnorm(1,2,1)
+    x2=runif(1,0,2)
+    u=runif(1,0, C2*g2(x1,x2))
+    
+     
+      while ( u >= ftilde(x1,x2) ) {
+      x1=rnorm(1,2,1)
+      x2=runif(1,0,2)
+      u=runif(1,0, C2*g2(x1,x2))
+ 
+      
+    }
+    M2[i,1]=x1
+    M2[i,2]=x2
+    
+  
+   }
+  
+  return(M2)
+}
+
+n=1000
+T2_a<-Sys.time()
+M2=rejet(1000)  
+T2_b<-Sys.time()  
+
+Tdiff2=difftime(T2_b,T2_a)
+
+
+M2_a1= M2[,1]  #colonne 1   
+M2_a2=M2[,2]  #colonne 2
+
+M2_a1_c=cut(M2_a1,20)  
+M2_a2_c=cut(M2_a2,20)
+z2=table(M2_a1_c,M2_a2_c)  
+
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j])  # permet de tracer f
+  } 
+} 
+
+# ici on superpose la fonction ftilde renormalise (donc la fonction f) pour voir si la methode de rejet permet bien de simuler sous f et on observe d'apres le graphique que oui. 
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densite f")
+plot3D::hist3D(z = z2, border = "black", theta = 40, phi = 40,main="Histogramme par rejet") # histogramme representant f par la methode de rejet 2.
+
+```
+
+
+```{r}
+#Methode 3: Rejet avec une densité instrumentale g suivant une loi cauchy (1,1/2) x uniforme (0,4)
+
+C3=6*pi
+g3<- function(x1,x2){dunif(x1,0,4)*dcauchy(x2,1,0.5)} 
+ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+
+
+rejet <- function(n) {
+  M3=matrix(0,ncol=2,nrow=n)
+  for (i in 1:n) {
+    x1=runif(1,0,4)
+    x2=rcauchy(1,1,0.5)
+    u=runif(1,0, C3*g3(x1,x2))
+    
+     
+    while ( u >= ftilde(x1,x2) ) {
+       x1=runif(1,0,4)
+       x2=rcauchy(1,1,0.5)
+       u=runif(1,0, C3*g3(x1,x2))
+      
+    }
+    M3[i,1]=x1
+    M3[i,2]=x2
+    
+  
+   }
+  
+  return(M3)
+}
+n=1000
+T3_a<-Sys.time()
+M3=rejet(1000)
+T3_b<-Sys.time()
+
+Tdiff3=difftime(T3_b,T3_a)
+
+M3_a1= M3[,1]  #colonne 1 
+M3_a2=M3[,2]  #colonne 2
+
+M3_a1_c=cut(M3_a1,20)
+M3_a2_c=cut(M3_a2,20)
+z3=table(M3_a1_c,M3_a2_c)
+
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j])  # permet de tracer f
+  } 
+} 
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densité f")
+plot3D::hist3D(z = z3, border = "black", theta = 40, phi = 40, main="Histogramme par rejet") # histogramme representant f par la methode de rejet 3.
+```
+
+
+```{r}
+# Methode 4 : Rejet avec une densite instrumentale g suivant une loi normale (2,1) x cauchy (1,1/2)
+
+C4 = 3/sqrt(2) * ( (pi)**(3/2) )
+g4<- function(x1,x2){dnorm(x1,2,1)*dcauchy(x2,1,0.5)} 
+ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+
+rejet <- function(n) {
+  M4=matrix(0,ncol=2,nrow=n)
+  for (i in 1:n) {
+  	x1=rnorm(1,2,1)
+    x2=rcauchy(1,1,0.5)
+    u=runif(1,0, C4*g4(x1,x2))
+    
+     
+      while ( u >= ftilde(x1,x2) ) {
+       x1=rnorm(1,2,1)
+       x2=rcauchy(1,1,0.5)
+       u=runif(1,0, C4*g4(x1,x2))
+      
+    }
+    M4[i,1]=x1
+    M4[i,2]=x2
+    
+  
+   }
+  
+  return(M4)
+}
+n=1000
+
+T4_a<-Sys.time()
+M4=rejet(1000)
+T4_b<-Sys.time()
+
+Tdiff4=difftime(T4_b,T4_a)  
+
+M4_a1= M4[,1]  #colonne 1 
+M4_a2=M4[,2]  #colonne 2
+
+M4_a1_c=cut(M4_a1,20)
+M4_a2_c=cut(M4_a2,20)
+z4=table(M4_a1_c,M4_a2_c)
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j])  # permet de tracer f
+  } 
+} 
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densite f")
+plot3D::hist3D(z = z4, border = "black", theta = 40, phi = 40,main="Histogramme par rejet") # histogramme representant f par la méthode de rejet 4.
+
+```
+
+
+```{r}
+# Methode 5 : Rejet avec une densite instrumentale g suivant une loi normale (2,1) tronque sur[0,4] x cauchy (1,1/2) tronque sur[0,2]
+
+F_cauchy= pcauchy(2,1,0.5)- pcauchy(0,1,0.5)
+F_normale= pnorm(4,2,1)-pnorm(0,2,1)
+
+C5 = 3/sqrt(2) * ( (pi)**(3/2) ) * F_cauchy * F_normale
+
+simucauchytronque <- function(a,b){    #fonction qui simule 1 realisation de la loi cauchy (1,0.5) X sachant X dans [a,b]
+	u=runif(1)
+    val= qcauchy( pcauchy(a,1,0.5) + ( pcauchy(b,1,0.5) - pcauchy(a,1,0.5) ) * u , 1, 0.5)
+    return(val)
+    }
+    
+simunormaletronque <- function(a,b){    #fonction qui simule 1 realisation de la loi normale (2,1) X sachant X dans [a,b]
+	u=runif(1)
+    val= qnorm( pnorm(a,2,1) + ( pnorm(b,2,1) - pnorm(a,2,1) )*u , 2, 1)
+    return(val)
+    }
+
+g5<- function(x1,x2){dnorm(x1,2,1)* 1/F_normale * (x1>=0 & x1<=4) * dcauchy(x2,1,0.5) * 1/F_cauchy * (x2>=0 & x2<=2)} # densite couple lois tronquees.
+
+ftilde<-function(x1,x2){((((cos(x1)**2)+2*(sin(x2)**2)*(cos(x1)**4))/(1+4*((x2-1)**2)))*exp(-((x1-2)**2)/2))*(x1<=4)*(x1>=0)*(x2<=2)*(x2>=0)}
+
+rejet <- function(n) {
+	
+  M5=matrix(0,ncol=2,nrow=n)
+  for (i in 1:n) {
+     x1=simunormaletronque(0,4) 
+     x2=simucauchytronque(0,2)
+     u=runif(1,0, C5*g5(x1,x2))
+        
+      while ( u >= ftilde(x1,x2) ) {
+       x1=rnorm(1,2,1)
+       x2=rcauchy(1,1,0.5)
+       u=runif(1,0, C5*g5(x1,x2))
+      
+    }
+    M5[i,1]=x1
+    M5[i,2]=x2
+    
+  
+   }
+  
+  return(M5)
+}
+n=1000
+
+T5_a<-Sys.time() 
+M5=rejet(1000)
+T5_b<-Sys.time()
+
+Tintermediaire_a<- Sys.time ()
+A=simunormaletronque(0,4)
+B=simucauchytronque(0,2)
+Tintermediaire_b <- Sys.time()  # on doit enlever le temps pour simuler les tronquees...
+
+Tdiff5=difftime(T5_b,T5_a) - difftime(Tintermediaire_b,Tintermediaire_a)
+
+M5_a1= M5[,1]  #colonne 1 
+M5_a2=M5[,2]  #colonne 2
+
+M5_a1_c=cut(M5_a1,20)
+M5_a2_c=cut(M5_a2,20)
+z5=table(M5_a1_c,M5_a2_c)
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j])  # permet de tracer f
+  } 
+} 
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densité f")
+plot3D::hist3D(z = z5, border = "black", theta = 40, phi = 40, main="Histogramme par rejet") # histogramme representant f par la methode de rejet 5.
+```
+
+
+## Comparaison des temps d'éxécution des 5 différentes méthodes poue l'algorithme de rejet
+
+*En theorie, plus M petit , plus le nombre moyen d'essaie avant d'accepter une realisation venant de f est petit et donc le temps d'execution de l'algorithme est petit.*
+
+```{r}
+
+C=c(C1,C2,C3,C4,C5)
+C
+
+T=c(Tdiff1,Tdiff2,Tdiff3,Tdiff4,Tdiff5)
+T # la teorie est verifie en pratique.
+
+```
+
+## Algorithme de Metropolis-Hastings.
+```{r}
+#Question 4
+
+alphamh<-function(f,g,x1,x2,y1,y2){
+  return(min(1,f(y1,y2)*g(x1,x2)/(f(x1,x2)*g(y1,y2))))
+}
+
+n=1000
+metrohast<-function(n,f){  
+  y1=rnorm(n,2,1)
+  y2=runif(n,0,2)
+  u=runif(n)
+  x=matrix(0,nrow=n,ncol=2)
+  g<- function(x1,x2){dnorm(x1,2,1)*dunif(x2,0,2)} # pour implementer metrohast, on a choisi arbitrairement g2 definit precedemment
+  for(t in 2:n){
+    a=alphamh(f,g,x[t-1,1],x[t-1,2],y1[t],y2[t])
+    z=rbinom(1,1,a)
+    x[t,1]=x[t-1,1]+(y1[t]-x[t-1,1])*z
+    x[t,2]=x[t-1,2]+(y2[t]-x[t-1,2])*z
+  }
+  return(x)
+}
+
+
+# En observant les valeurs de la suite Xt, on remarque que l'on change peu de fois de valeur, cela signifie peut etre que alpha est tres petit et donc avec proba proche de 1, xt+1=xt ...
+
+# On trace maintenant l'histogramme de l'algo de metro-hast et la fonction f 
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(v)){ 
+    M[i,j] <- c_methode2 * ftilde(u[i], v[j]) 
+  } 
+} 
+
+
+# Metropolis-Hastings 1
+Mh=metrohast(n,ftilde)
+Mh1=Mh[,1]  
+Mh2=Mh[,2]
+Mh1_c=cut(Mh1,20)
+Mh2_c=cut(Mh2,20)
+z6=table(Mh1_c, Mh2_c)
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densité de f")
+plot3D::hist3D(z = z6, border = "black", theta = 40, phi = 40, main="Histogramme Metro-Hastings 1")  
+```
+On observe finalement que l'algorithme de Metropolis-Hastings 1 est peu performant relativement a celle du rejet.
+
+En effet, l'algorithme de Metropolis-Hastings ne donne pas assez de realisations distinctes du a la petite valeur de alpha.
+
+De plus, compte tenu de la stationnarite de la chaine de markov, il est preferable de ne pas  regarder les premieres valeurs de la suite.
+
+Une solution a cela pourrait etre de faire tourner l'algorithme est de prendre a chaque fois la millieme realisation et de creer ainsi un vecteur avec les millieme observations ...
+
+C'est ce qu'on va faire maintenant.
+
+
+```{r}
+# Metropolis-Hastings 2
+
+n=1000
+vect=matrix(0,ncol=2,nrow=n)
+for(i in 1:n){
+  Mhtilde=metrohast(n,ftilde)
+  vect[i,1]=Mhtilde[n,1] 
+  vect[i,2]=Mhtilde[n,2]
+}
+ 
+Mh1tilde=vect[,1]  
+Mh2tilde=vect[,2]
+Mh1tilde_c=cut(Mh1tilde,20)
+Mh2tilde_c=cut(Mh2tilde,20)
+z7=table(Mh1tilde_c, Mh2tilde_c)
+
+u <- seq(0, 4, length.out = 100) 
+v <- seq(0, 2, length.out = 100)
+M <- matrix(NA, length(u), length(u)) 
+for(i in 1:length(u)){ 
+  for(j in 1:length(u)){ 
+    M[i,j] <- c_methode2*ftilde(u[i], v[j]) 
+  } 
+} 
+
+par(mfrow=c(1,2))
+persp(u, v, M, theta = 40, phi = 40,col='blue', main="Densite de f") #fonction f en 3d
+plot3D::hist3D(z = z7, border = "black", theta = 40, phi = 40, main="Histogramme Metro-Hastings 2") 
+```
+
+
+# Comparaison Methode de rejet / Metropolis-Hastings
+
+```{r}
+# Question 5 : Comparaison methode du rejet et methode de Metropolis-Hastings 2
+
+par(mfrow=c(1,3)) # permet d'afficher 3 graphiques cote a cote.
+
+persp(u, v, M, theta = 40, phi = 40,col='blue',main="Densite f")
+
+plot3D::hist3D(z = z5, border = "black", theta = 40, phi = 40, main = "Methode rejet") # Histogramme obtenu par methode rejet avec g5 ( g suivant normal tronquee x cauchy tronquée)
+
+plot3D::hist3D(z = z7, border = "black", theta = 40, phi = 40, main = "Metropolis-Hastings 2")
+
+```
+On remarque qu'on peut difficilement comparer a l'aide des histogrammes.
+
+
+```{r}
+# Comparaison par QQ-Plot
+
+par(mfrow=c(1,2))
+
+qqplot(M5[,1],Mh1tilde,type='l',xlab='Quantile de MR selon 1ere coordonnee',ylab='Quantile de MH2 selon 1ère coordonnee ',main="Q-Q  Plot") #selon x cela converge trop lentement
+
+qqplot(M5[,2],Mh2tilde,type='l',xlab='Quantile de MR selon 2eme coordonnee',ylab='Quantile de MH2 selon 2eme coordonnee',main="Q-Q  Plot") 
+```
+
+# Exercice 2: Methode de Monte-Carlo.
+
+#GENERAL
+
+```{r}
+# Fonctions qui nous serviront tout au long de l'exercice.
+
+IC<-function(n,x,s){  # IC de niveau s
+  delta <- mean(x)
+  q <- qnorm(0.5*(1+s))*sqrt(var(x)/n) 
+  return(list(IC=c(delta-q,delta+q),LongueurIC=2*q))
+}
+
+estimVar1<-function(x){ #vecteur pour voir l'evolution de la variance 
+  return((x-cumsum(x)/1:n)^2)
+}
+
+evolE<-function(x){ #evol estim
+  return(cumsum(x)/(1:length(x)))
+}
+
+evolIC<-function(x,delta,level){  #x est l'echantilLon de l'estim et delta est evol estim
+  n=length(x)
+  s2<-(cumsum(x^2 )-( 1 : n )*(delta)^2)/(0:(n-1) )
+  IC<-qnorm(0.5*(level+1))*sqrt(s2/(1:n))  #calcul de q*racinede var
+  return(data.frame(var=s2,born_inf_IC=delta-IC,born_sup_IC=delta+IC))
+}
+
+```
+##Partie 1
+#Question 1.a
+
+```{r}
+# Partie 1
+# Question 1
+#on prend une loi de weibull de paramètre de forme 2 et d'echelle 1 et on applique monte carlo 
+#classique a la proba delta et on prend t=2
+
+# Question 1.a
+n=10000
+lev=0.95 #niveau IC
+x=rweibull(n,2,1)
+
+MC<-function(y,lev,aff,z,w){ #z et w sont pour ylim ici on prend -0.1 et 0.2
+  a<-evolE(y)
+  b<-evolIC(y,a,lev)
+  n<-length(y)
+  if(aff==1){#var booleene et trace le graph si aff=1
+    par(mfrow=c(1,1))
+    plot(1:n,a,type='l',lwd=2,col='blue',main='evol estimation',ylim=c(z,w),xlab='n',ylab='y')
+    lines(2:n, b$born_inf_IC[-1],col='gold',lwd=2)
+    lines(2:n, b$born_sup_IC[-1],col='gold',lwd=2)
+    legend('topright',c('IC','estim'),lwd=c(2,1),col=c('gold','blue'),
+           inset=0.05,bg='gray95',box.lty=0)
+  }
+  return(data.frame(value=a[n],b[n,],l=a,row.names=NULL))
+}
+
+h <- function(x){ifelse(x>=2,1,0)}
+MC(h(x),lev,1,-0.1,0.2)[n,][-5]  # permet de tracer le graphe et la les val pour monte carlo classique
+
+```
+
+#Question 1.b et donnees pour la comparaison
+
+```{r}
+#Question 1.b et donnees pour la comparaison
+
+#on montre theoriquement que P(Z>t)=E[h1(U)] avec h1 defini dans la suite
+#et U suivant une U(0,1) et Z une loi de weibull(2,1)
+#Dk=[(k-1)/K,k/K] une partition [0,1] et U la va de strat (k-1+U)/K meme loi que A
+#où A~U/U_appartient_a Dk (cf ex1 du TD4)
+
+h1<-function(x){
+  ifelse(((1/2)*(-log(1-x)))>=2,1,0)
+}
+
+K=10000
+y=c()
+D=seq(0,1,by=1/K)
+for (k in 1:(length(D)-1)) {
+  u=runif(1)
+  y[k]=D[k]+(u/K)  # D[k]+(u/K) = (k-1+u)/K
+  
+}
+
+z=mean(h1(y))
+
+list(pchap=z,var=var(h1(y)),IC=IC(10000,h1(y),0.95))#affichage des differentes valeurs prises pour la methode
+
+```
+
+#Question 2.a
+
+```{r}
+#Question 2.a
+
+phi<-function(x,y){ifelse((x+y)>=1,1,0)}
+f.inv<-function(x){4*x*(x>=0)*(x<=(1/4))+1*(x>=0.25)*(x<=(3/4))+((4*x)-2)*(x>=(3/4))*(x<=1)}
+u=runif(n)
+x3=f.inv(u)
+Y=rgamma(n,2,1)
+MC_compo=mean(phi(x3,Y))
+n=10000
+lev=0.95 #niveau de l'IC
+
+MC(phi(x3,Y),lev,1,0.7,1.2)[n,][-5] 
+
+```
+
+#Question 2.c
+
+```{r}
+#Question 2.c
+#avec G
+g<-function(x){1-pgamma((1-x),2,1)}
+#on reprend le x3 qui simuler X3
+u=runif(n)
+x3=f.inv(u)
+MC_compo2=mean(g(x3))
+
+MC(g(x3),lev,1,0.7,1.2)[n,][-5]
+
+```
+
+
+
+```{r}
+#avec F
+Y=rgamma(n,2,1)
+f_repart<-function(x){
+  ((x/4)*(x>=0)*(x<1))+(((x/4)+(1/2))*(x>=1)*(x<=2))+(1*(x>=2)) #la fonction de repartition donnees
+}
+teta<-function(x){
+  1-f_repart(1-x)#on reprend le Y pour simuler les gamma
+}
+MC_compo3=mean(teta(Y))
+
+MC(teta(Y),lev,1,0.7,1.2)[n,][-5]
+
+
+```
+
+#Question 2.c : Comparaison
+
+```{r}
+#Question 2.c : Comparaison
+
+plot(1:n,MC(phi(x3,Y),lev,0,0.7,1.2)[[5]],type='l',col='blue',
+     lwd=2,main='cvg estim',xlab='n',ylim=c(0.7,1.2),ylab='estim')
+lines(MC(g(x3),lev,0,0.7,1.2)[[5]],lwd=2,col="mediumseagreen")
+lines(MC(teta(Y),lev,0,0.7,1.2)[[5]],lwd=2,col="gold")
+legend('topright',c('MC','MC_G','MC_F'),col=c('blue','mediumseagreen','gold'),
+       lwd=c(1,1,1),box.lty = 0,inset=0.05,bg='gray95')
+
+
+```
+
+##Partie 2
+#Question 1
+
+```{r}
+#Partie 2
+#Question 1
+#simulation du vecteur de simulation avec les xi suivant des loi exp
+n=10000
+x=matrix(0,ncol=5,nrow=n)
+
+simul_vect<-function(l1,l2,l3,l4,l5){
+  x[1:n,1]=rexp(n,l1)
+  x[1:n,2]=rexp(n,l2)
+  x[1:n,3]=rexp(n,l3)
+  x[1:n,4]=rexp(n,l4)
+  x[1:n,5]=rexp(n,l5)
+  return(x)
+}
+M=simul_vect(6,7,3,2,1)
+v=c()
+for (i in 1:n){
+  v[i]=min( M[i,1]+M[i,4], M[i,2]+M[i,5] , M[i,1]+M[i,3]+M[i,5] , M[i,2]+M[i,3]+M[i,4] )
+}
+
+
+g<-function(x){
+  ifelse(x>=2,1,0)
+}
+#mc_p=mean(g(v))
+#mc_p #estimateur de mc
+#var(g(v)) #var de lestim
+#IC(n,g(v),0.95) #l'IC 
+MC(g(v),0.95,1,-0.02,0.05)[n,][-5]#le graph
+
+```
+
+#Question 2.b
+
+```{r}
+#Question 2.b
+
+#en simulant avec la methode de rejet
+
+M=1 # on peut enlever le p car comme exercice 1 equivalent de travailler avec g tilde proportionnelle 
+f_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,6) * dexp(x2,7) * dexp(x3,3) * dexp(x4,2) * dexp(x5,1)   } # f est ici la densite instrumentale
+t=2 
+gtilde_sim<-function(x1,x2,x3,x4,x5){ # gtilde proportionnelle a g , g est la fonction a simuler
+  ifelse(min(x1+x4,x2+x5,x1+x3+x5,x2+x3+x4)>=t,1,0)*dexp(x1,6)*dexp(x2,7)*dexp(x3,3)*dexp(x4,2)*dexp(x5,1) }
+
+rejet <- function(n) {
+  M1=matrix(0,ncol=5,nrow=n)
+  for (i in 1:n) {
+    x1=rexp(1,6)
+    x2=rexp(1,7)
+    x3=rexp(1,3)
+    x4=rexp(1,2)
+    x5=rexp(1,1)
+    u=runif(1,0, M*f_expo(x1,x2,x3,x4,x5))
+    
+    while ( u >= gtilde_sim(x1,x2,x3,x4,x5)) {
+      x1=rexp(1,6)
+      x2=rexp(1,7)
+      x3=rexp(1,3)
+      x4=rexp(1,2)
+      x5=rexp(1,1)
+      u=runif(1,0,M*f_expo(x1,x2,x3,x4,x5))
+      
+    }
+    M1[i,1]=x1
+    M1[i,2]=x2
+    M1[i,3]=x3
+    M1[i,4]=x4
+    M1[i,5]=x5
+    
+  }
+  
+  return(M1)
+}
+
+
+#n=100
+#rejet(n)
+
+```
+
+#Question 4
+
+```{r}
+#Question 4
+
+pn_chap<- function(n,alpha){ #alpha est un vecteur
+  V=c()   
+  for(i in 1:n){    
+    x1=rexp(1,alpha[1])
+    x2=rexp(1,alpha[2])
+    x3=rexp(1,alpha[3])
+    x4=rexp(1,alpha[4])
+    x5=rexp(1,alpha[5])
+    f_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,6) * dexp(x2,7) * dexp(x3,3) * dexp(x4,2) * dexp(x5,1)   }
+    h_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,alpha[1]) * dexp(x2,alpha[2]) * dexp(x3,alpha[3]) * dexp(x4,alpha[4]) * dexp(x5,alpha[5])   }
+    u <- function(x1,x2,x3,x4,x5) { ifelse(min(x1+x4,x2+x5,x1+x3+x5,x2+x3+x4)>=2,1,0) }  
+    V[i]= u(x1,x2,x3,x4,x5)*f_expo(x1,x2,x3,x4,x5)/h_expo(x1,x2,x3,x4,x5)
+    
+  }  
+  MC(V,lev,1,-0.02,0.03)[n,][-5]
+  return(list(deltachap=mean(V),variance=var(V),IC=IC(n,V,0.95)))
+  
+}      
+n=10000
+alpha1=c(6,7,3,2,1) #donnees entrees par l'utilisateur 
+pn_chap(n,alpha1)#pour la question 4 on renvoi la table le graph
+
+```
+
+#Question 7
+
+```{r}
+#Question 7
+  
+alphaJstar <- function(n,alpha0,j) { 	  
+		lambda <- c(6,7,3,2,1)
+	    h_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,alpha0[1]) * dexp(x2,alpha0[2]) * dexp(x3,alpha0[3]) * dexp(x4,alpha0[4]) * dexp(x5,alpha0[5]) }
+	    N=c()
+	    D=c()
+        for(k in 1:n) {
+      	   x1=rexp(1,alpha0[1])
+      	   x2=rexp(1,alpha0[2])
+           x3=rexp(1,alpha0[3])
+           x4=rexp(1,alpha0[4])
+           x5=rexp(1,alpha0[5])	
+           X=c(x1,x2,x3,x4,x5) 
+           P=1 
+	       for (i in 1:5) {
+		       P=P*lambda[i]/alpha0[i]*exp(-(lambda[i]-alpha0[i])*X[i] )
+           }
+           N[k] = P*ifelse(min(x1+x4,x2+x5,x1+x3+x5,x2+x3+x4)>=2,1,0)
+           D[k] = P*ifelse(min(x1+x4,x2+x5,x1+x3+x5,x2+x3+x4)>=2,1,0)*X[j]    
+           
+         }  
+       return(mean(N)/mean(D))
+} 
+
+n=10000
+alpha0=c(6,7,3,2,1)
+alphastar=c()
+for (j in 1:5){ 
+    alphastar[j]=alphaJstar(n,alpha0,j)
+}	
+	
+
+pn_chap(n,alphastar) #pour la question 7 on renvoi la table le graph
+
+
+
+```
+
+#Question 7: Comparaison de MC classique, echantillonnage preferentielle
+#et echantillonnage preferentielle avec alphastar
+
+```{r}
+# Comparaison de MC classique, echantillonnage preferentiel
+#et echantillonnage preferentiel avec alphastar
+
+#Comparaison entre q1,q4 et q7
+
+n=10000
+alpha1=c(6,7,3,2,1)
+
+pn_chap7<- function(n,alpha){ #On veut juste le vecteur V
+  V=c()   
+  for(i in 1:n){    
+    x1=rexp(1,alpha[1])
+    x2=rexp(1,alpha[2])
+    x3=rexp(1,alpha[3])
+    x4=rexp(1,alpha[4])
+    x5=rexp(1,alpha[5])
+    f_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,6) * dexp(x2,7) * dexp(x3,3) * dexp(x4,2) * dexp(x5,1)   }
+    h_expo <- function(x1,x2,x3,x4,x5) { dexp(x1,alpha[1]) * dexp(x2,alpha[2]) * dexp(x3,alpha[3]) * dexp(x4,alpha[4]) * dexp(x5,alpha[5])   }
+    u <- function(x1,x2,x3,x4,x5) { ifelse(min(x1+x4,x2+x5,x1+x3+x5,x2+x3+x4)>=2,1,0) }  
+    V[i]= u(x1,x2,x3,x4,x5)*f_expo(x1,x2,x3,x4,x5)/h_expo(x1,x2,x3,x4,x5)
+    
+  }  
+  return(V)
+  
+  
+}     
+
+
+
+
+estint_2=cumsum(pn_chap7(n,alpha1))/(1:n)
+estint_3=cumsum(pn_chap7(n,alphastar))/(1:n)
+
+
+plot(1:n,MC(g(v),0.95,1,-0.02,0.05)[[5]],type='l',col='blue',
+     lwd=2, main='cvg estim',xlab='n',ylim=c(-0.02,0.05),ylab='estim')
+lines(estint_2,lwd=2,col="mediumseagreen")
+lines(estint_3,lwd=2,col="gold")
+legend('topright',c('MC_classique','MCPref_avc_alpha_pas_opti','MCPref_avc_alpha_star'),col=c('blue','mediumseagreen','gold'),
+       lwd=c(1,1,1),box.lty = 0,inset=0.05,bg='gray95')
+
+```
+
+#Question 8b
+
+```{r}
+#Question 8b
+va_anti <- function(n,alphastar){
+  lambda <- c(6,7,3,2,1)
+  
+  h=c()
+  hcompoA=c()
+  for (i in 1:n) {
+    P=1
+    G=1
+    Ui=runif(5)
+    for (k in 1:5) {
+      P = P * (lambda[k]/alphastar[k])*( Ui[k]**(lambda[k]/alphastar[k] - 1) ) * ifelse (min ( (-1/alphastar[1])*log(Ui[1]) + (-1/alphastar[4])*log(Ui[4]), (-1/alphastar[2])*log(Ui[2])  + (-1/alphastar[5])*log(Ui[5])   , (-1/alphastar[1])*log(Ui[1]) + (-1/alphastar[3])*log(Ui[3]) + (-1/alphastar[5])*log(Ui[5])   ,  (-1/alphastar[2])*log(Ui[2]) + (-1/alphastar[3])*log(Ui[3]) + (-1/alphastar[4])*log(Ui[4])  ) >=2,1,0)
+      
+      G = G * (lambda[k]/alphastar[k])*( (1-Ui[k])**(lambda[k]/alphastar[k] - 1) ) * ifelse (min ( (-1/alphastar[1])*log(1-Ui[1]) + (-1/alphastar[4])*log(1-Ui[4]), (-1/alphastar[2])*log(1-Ui[2])  + (-1/alphastar[5])*log(1-Ui[5])   , (-1/alphastar[1])*log(1-Ui[1]) + (-1/alphastar[3])*log(1-Ui[3]) + (-1/alphastar[5])*log(1-Ui[5])   ,  (-1/alphastar[2])*log(1-Ui[2]) + (-1/alphastar[3])*log(1-Ui[3]) + (-1/alphastar[4])*log(1-Ui[4])  ) >=2,1,0)
+      
+    }
+    h[i]=P
+    hcompoA[i]=G
+  }
+  h_anti=(h+hcompoA)/2
+  MC(h_anti,lev,1,-0.02,0.03)[n,][-5]
+  return(list(pchap=mean(h_anti),var=var(h_anti),IC=IC(n,h_anti,0.95)))	
+}			
+
+n=10000
+alpha0=c(6,7,3,2,1)
+va_anti(n,alphastar)
+
+
+
+```
+
+#Question 8c :Comparaison
+
+```{r}
+#Question 8c :Comparaison 
+
+va_anti_2 <- function(n,alphastar){ #juste avoir le vecteur h_anti
+  lambda <- c(6,7,3,2,1)
+  
+  h=c()
+  hcompoA=c()
+  for (i in 1:n) {
+    P=1
+    G=1
+    Ui=runif(5)
+    for (k in 1:5) {
+      P = P * (lambda[k]/alphastar[k])*( Ui[k]**(lambda[k]/alphastar[k] - 1) ) * ifelse (min ( (-1/alphastar[1])*log(Ui[1]) + (-1/alphastar[4])*log(Ui[4]), (-1/alphastar[2])*log(Ui[2])  + (-1/alphastar[5])*log(Ui[5])   , (-1/alphastar[1])*log(Ui[1]) + (-1/alphastar[3])*log(Ui[3]) + (-1/alphastar[5])*log(Ui[5])   ,  (-1/alphastar[2])*log(Ui[2]) + (-1/alphastar[3])*log(Ui[3]) + (-1/alphastar[4])*log(Ui[4])  ) >=2,1,0)
+      
+      G = G * (lambda[k]/alphastar[k])*( (1-Ui[k])**(lambda[k]/alphastar[k] - 1) ) * ifelse (min ( (-1/alphastar[1])*log(1-Ui[1]) + (-1/alphastar[4])*log(1-Ui[4]), (-1/alphastar[2])*log(1-Ui[2])  + (-1/alphastar[5])*log(1-Ui[5])   , (-1/alphastar[1])*log(1-Ui[1]) + (-1/alphastar[3])*log(1-Ui[3]) + (-1/alphastar[5])*log(1-Ui[5])   ,  (-1/alphastar[2])*log(1-Ui[2]) + (-1/alphastar[3])*log(1-Ui[3]) + (-1/alphastar[4])*log(1-Ui[4])  ) >=2,1,0)
+      
+    }
+    h[i]=P
+    hcompoA[i]=G
+  }
+  h_anti=(h+hcompoA)/2
+  return(h_anti)	
+}			
+
+n=10000
+alpha0=c(6,7,3,2,1)
+
+
+estint_4=cumsum(va_anti_2(n,alphastar))/(1:n)
+#On trace le plot des 3 estimateurs
+
+plot(1:n,MC(g(v),0.95,1,-0.02,0.03)[[5]],type='l',col='blue',
+     lwd=2,main='cvg estim',xlab='n',ylim=c(-0.02,0.03),ylab='estim')#pour mc classique
+lines(estint_3,lwd=2,col="gold")#pour alphastar
+lines(estint_4,lwd=2,col="mediumseagreen")#pour anti
+legend('topright',c('MC_classique','MC_ECHPREF','MC_ANTI'),col=c('blue','gold','mediumseagreen'),
+       lwd=c(1,1,1),box.lty = 0,inset=0.05,bg='gray95')
+```
+
+
+
+
+
+
+
+
+
